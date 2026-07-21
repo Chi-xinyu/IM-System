@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>网页聊天室</title>
+</head>
+<body>
+    <div id = "msgBox" style = "height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px"></div>
+    <input id = "input" style = "width: 300px"/>
+    <button onclick = "send()" >发送</button>
+
+    <script>
+        // 固定8080端口ws协议
+        let ws = new WebSocket("ws://127.0.0.1:8080/api/ws");
+        let msgBox = document.getElementById("msgBox");
+        let input = document.getElementById("input");
+
+        function loadHistory() {
+            fetch("/api/history")
+                .then(res => res.json())
+                .then(ret => {
+                    // 遍历数据库返回的历史记录，渲染到聊天框
+                    ret.data.forEach(item => {
+                        let html = `[${item.CreateTime}] ${item.Sender}: ${item.Content}<br/>`
+                        msgBox.innerHTML += html
+                    })
+                    // 滚动条自动滑到最底部
+                    msgBox.scrollTop = msgBox.scrollHeight
+                })
+        }
+        // 页面打开立刻加载数据库历史记录
+        loadHistory()
+
+        // 接收后端实时消息
+        ws.onmessage = e => {
+            msgBox.innerHTML += e.data + "<br/>"
+            msgBox.scrollTop = msgBox.scrollHeight
+        }
+
+        // ws连接失败打印控制台日志
+        ws.onerror = function (err) {
+            console.error("WebSocket连接出错：", err)
+        }
+
+        // 发送按钮点击事件
+        function send() {
+            let val = input.value.trim()
+            if(!val) return     // 空消息不发送
+            ws.send(val)        // 通过websocket发送文本到后端
+            input.value = ""    // 清空输入框
+        }
+    </script>
+</body>
+</html>

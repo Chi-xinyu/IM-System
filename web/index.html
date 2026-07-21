@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>聊天室后台管理</title>
+    <style>
+        .item {margin:10px 0; padding: 8px; border: 1px solid #ccc; display: flex; justify-content: space-between}
+        button{background: red; color: white; border: none; padding: 4px 10px; cursor: pointer}
+    </style>
+</head>
+<body>
+    <h2>在线用户列表</h2>
+    <div id = "userList"></div>
+    <script>
+        //刷新用户列表
+        function loadUser() {
+            fetch("/api/online")
+                .then(res=> res.json())
+                .then(ret=> {
+                    let html = "";
+                    // 遍历所有在线用户，渲染带踢出按钮的卡片
+                    ret.data.forEach(item=> {
+                        html += `
+                            <div class = "item">
+                                <span>昵称：${item.name} | 地址：${item.addr}</span>
+                                <button onclick = "kick('${item.name}')">踢出</button>
+                            </div>
+                        `
+                    })
+                    document.getElementById("userList").innerHTML = html
+                })
+        }
+
+        //踢出用户
+        function kick(name) {
+            fetch("/api/kick", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({username: name})
+            }).then(()=> loadUser())
+        }
+
+        //自动刷新
+        loadUser()
+        setInterval(loadUser, 300)
+    </script>
+    <!-- 查看数据库历史消息按钮 -->
+    <button onclick="loadHistoryMsg()">查看数据库历史聊天记录</button>
+    <div id="historyBox" style="margin-top:20px;border:1px solid #666;padding:10px;height:300px;overflow-y:auto"></div>
+
+    <script>
+        function loadHistoryMsg() {
+            fetch("/api/history")
+                .then(res=>res.json())
+                .then(ret=>{
+                    let html = ""
+                    ret.data.forEach(item=>{
+                        html += `[${item.CreateTime}] ${item.Sender}: ${item.Content}<br/>`
+                    })
+                    document.getElementById("historyBox").innerHTML = html
+                })
+        }
+    </script>
+</body>
+</html>
