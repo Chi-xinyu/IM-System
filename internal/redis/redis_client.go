@@ -3,6 +3,8 @@ package redis
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -16,21 +18,27 @@ var ctx = context.Background()
 type PubSub = redis.PubSub
 
 // InitRedis 初始化redis连接池
-func InitRedis(addr, password string, db int) error {
+func InitRedis() error {
+	addr := os.Getenv("REDIS_ADDR")
+	pwd := os.Getenv("REDIS_PWD")
+	dbIdx, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
+	if addr == "" {
+		addr = "127.0.0.1:6379"
+	}
+
 	RedisClient = redis.NewClient(&redis.Options{
 		Addr:         addr,
-		Password:     password,
-		DB:           db,
-		PoolSize:     20, // 连接池大小
-		MinIdleConns: 5,  // 最小空闲连接
+		Password:     pwd,
+		DB:           dbIdx,
+		PoolSize:     20,
+		MinIdleConns: 5,
 		IdleTimeout:  5 * time.Minute,
 	})
-	// 连通性测试
 	_, err := RedisClient.Ping(ctx).Result()
 	if err != nil {
 		return fmt.Errorf("redis连接失败: %w", err)
 	}
-	fmt.Println("Redis连接初始化成功")
+	fmt.Println("Redis连接初始化成功, addr:", addr)
 	return nil
 }
 

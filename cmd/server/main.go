@@ -36,7 +36,7 @@ func broadcastWS(msg string) {
 }
 
 func main() {
-	errRedis := redis.InitRedis("127.0.0.1:6379", "", 0)
+	errRedis := redis.InitRedis()
 	if errRedis != nil {
 		panic("Redis初始化失败：" + errRedis.Error())
 	}

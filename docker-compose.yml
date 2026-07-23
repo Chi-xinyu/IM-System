@@ -1,0 +1,45 @@
+services:
+  # Redis中间件服务
+  redis:
+    image: redis:7-alpine
+    container_name: im-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      # Redis数据持久化，重启不丢失在线缓存
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: always
+    networks:
+      im-net:
+
+  # IM Web网关（内置TCP服务）
+  im-server:
+    build: .
+    container_name: im-server
+    ports:
+      - "8080:8080" # Web/网页端端口
+      - "8888:8888" # TCP客户端端口
+    # 依赖redis，保证redis先启动
+    depends_on:
+      - redis
+    environment:
+      # 容器内redis服务名作为host，无需127.0.0.1
+      REDIS_ADDR: redis:6379
+      REDIS_PWD: ""
+      REDIS_DB: 0
+    volumes:
+      # SQLite聊天消息持久化
+      - sqlite_data:/app/db
+    restart: always
+    networks:
+      im-net:
+
+# 数据卷持久化
+volumes:
+  redis_data:
+  sqlite_data:
+
+# 自定义网络，容器互通
+networks:
+  im-net:

@@ -1,0 +1,30 @@
+# Go 编译产物
+im-webgate
+tcpclient
+*.exe
+*.out
+
+# Go 模块缓存、临时文件
+vendor/
+*.log
+*.tmp
+go.mod.backup
+go.sum.backup
+
+# 本地SQLite数据库（容器用数据卷挂载，不打包进镜像）
+db/
+
+# IDE、编辑器配置
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 系统隐藏文件
+.DS_Store
+Thumbs.db
+
+# docker自身文件
+.dockerignore
+Dockerfile
+docker-compose.yml

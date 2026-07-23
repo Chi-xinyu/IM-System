@@ -4,7 +4,6 @@ go 1.26.4
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gorilla/websocket v1.5.3
 	modernc.org/sqlite v1.53.0

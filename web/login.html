@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - IM聊天室</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            background-color: #161a23;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #eee;
+        }
+        .login-card {
+            background: #202634;
+            padding: 36px 32px;
+            border-radius: 16px;
+            width: 340px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        h2 {
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        #nickInput {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 10px;
+            border: none;
+            font-size: 16px;
+            background: #2c3444;
+            color: #fff;
+            outline: none;
+        }
+        #enterBtn {
+            width: 100%;
+            margin-top: 18px;
+            padding: 14px;
+            border-radius: 10px;
+            border: none;
+            background-color: #2563eb;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #enterBtn:hover {
+            opacity: 0.85;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+    <h2>输入昵称进入聊天室</h2>
+    <input id="nickInput" type="text" placeholder="请输入昵称" maxlength="12">
+    <button id="enterBtn">进入聊天室</button>
+</div>
+
+<script>
+    const nickInput = document.getElementById("nickInput");
+    const enterBtn = document.getElementById("enterBtn");
+
+    function enterRoom() {
+        let nick = nickInput.value.trim();
+        if (!nick) {
+            alert("昵称不能为空");
+            return;
+        }
+        // 跳转聊天室，url携带昵称参数
+        location.href = `chat.html?nick=${encodeURIComponent(nick)}`;
+    }
+    enterBtn.onclick = enterRoom;
+    nickInput.onkeydown = e => {
+        if (e.key === "Enter") enterRoom();
+    }
+</script>
+</body>
+</html>

@@ -2,64 +2,109 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>聊天室后台管理</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理</title>
     <style>
-        .item {margin:10px 0; padding: 8px; border: 1px solid #ccc; display: flex; justify-content: space-between}
-        button{background: red; color: white; border: none; padding: 4px 10px; cursor: pointer}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            background: #161a23;
+            color: #e8edf3;
+            padding: 30px;
+        }
+        h2 {
+            margin-bottom: 24px;
+            color: #ffffff;
+        }
+        .card {
+            background: #202634;
+            border-radius: 14px;
+            padding: 24px;
+            max-width: 720px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        }
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 14px;
+            background: #2a3142;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .kick-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: none;
+            background: #dc3545;
+            color: #fff;
+            cursor: pointer;
+        }
+        .tip-empty {
+            color: #8892a0;
+            padding: 10px;
+        }
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #4f9aff;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
-    <h2>在线用户列表</h2>
-    <div id = "userList"></div>
-    <script>
-        //刷新用户列表
-        function loadUser() {
-            fetch("/api/online")
-                .then(res=> res.json())
-                .then(ret=> {
-                    let html = "";
-                    // 遍历所有在线用户，渲染带踢出按钮的卡片
-                    ret.data.forEach(item=> {
-                        html += `
-                            <div class = "item">
-                                <span>昵称：${item.name} | 地址：${item.addr}</span>
-                                <button onclick = "kick('${item.name}')">踢出</button>
-                            </div>
-                        `
-                    })
-                    document.getElementById("userList").innerHTML = html
+<div class="card">
+    <a class="nav-link" href="./chat.html">← 返回聊天室</a>
+    <h2>在线用户管理</h2>
+    <div id="userList"></div>
+</div>
+
+<script>
+    const userListDom = document.getElementById("userList");
+
+    function loadOnlineUser() {
+        fetch("/api/online")
+            .then(r => r.json())
+            .then(res => {
+                const list = res.data;
+                userListDom.innerHTML = "";
+                if (list.length === 0) {
+                    userListDom.innerHTML = '<div class="tip-empty">暂无在线用户</div>';
+                    return;
+                }
+                list.forEach(u => {
+                    const div = document.createElement("div");
+                    div.className = "user-item";
+                    div.innerHTML = `
+                            <div>昵称：${u.name}<br><small style="color:#99a3b2">地址：${u.addr}</small></div>
+                            <button class="kick-btn" data-name="${u.name}">踢出</button>
+                        `;
+                    userListDom.appendChild(div);
+                });
+
+                // 绑定踢出事件
+                document.querySelectorAll(".kick-btn").forEach(btn => {
+                    btn.onclick = async function () {
+                        const name = this.dataset.name;
+                        if (!confirm(`确认踢出【${name}】？`)) return;
+                        const resp = await fetch("/api/kick", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({Username: name})
+                        });
+                        const result = await resp.json();
+                        alert(result.msg);
+                        loadOnlineUser();
+                    }
                 })
-        }
-
-        //踢出用户
-        function kick(name) {
-            fetch("/api/kick", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({username: name})
-            }).then(()=> loadUser())
-        }
-
-        //自动刷新
-        loadUser()
-        setInterval(loadUser, 300)
-    </script>
-    <!-- 查看数据库历史消息按钮 -->
-    <button onclick="loadHistoryMsg()">查看数据库历史聊天记录</button>
-    <div id="historyBox" style="margin-top:20px;border:1px solid #666;padding:10px;height:300px;overflow-y:auto"></div>
-
-    <script>
-        function loadHistoryMsg() {
-            fetch("/api/history")
-                .then(res=>res.json())
-                .then(ret=>{
-                    let html = ""
-                    ret.data.forEach(item=>{
-                        html += `[${item.CreateTime}] ${item.Sender}: ${item.Content}<br/>`
-                    })
-                    document.getElementById("historyBox").innerHTML = html
-                })
-        }
+            })
+    }
+    loadOnlineUser();
+    setInterval(loadOnlineUser, 3000);
     </script>
 </body>
 </html>

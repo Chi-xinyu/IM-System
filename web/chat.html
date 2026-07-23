@@ -2,53 +2,161 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>网页聊天室</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聊天室</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background-color: #161a23;
+            color: #eee;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            padding: 14px 20px;
+            background: #202634;
+            font-size: 18px;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #onlineCount {
+            font-size: 14px;
+            color: #8892a0;
+        }
+        .container {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+        .msg-item {
+            margin-bottom: 16px;
+            display: flex;
+        }
+        .msg-left {
+            justify-content: flex-start;
+        }
+        .msg-right {
+            justify-content: flex-end;
+        }
+        .msg-box {
+            max-width: 65%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            line-height: 1.55;
+        }
+        .msg-left .msg-box {
+            background-color: #2a3142;
+        }
+        .msg-right .msg-box {
+            background-color: #2563eb;
+        }
+        .sender-name {
+            font-size: 12px;
+            color: #a2acbd;
+            margin-bottom: 4px;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            padding: 16px;
+            background: #202634;
+        }
+        #inputMsg {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 999px;
+            border: none;
+            font-size: 15px;
+            outline: none;
+            background: #2c3444;
+            color: #fff;
+        }
+        #sendBtn {
+            padding: 0 24px;
+            border-radius: 999px;
+            border: none;
+            background-color: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+        #sendBtn:hover {
+            opacity: 0.85;
+        }
+    </style>
 </head>
 <body>
-    <div id = "msgBox" style = "height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px"></div>
-    <input id = "input" style = "width: 300px"/>
-    <button onclick = "send()" >发送</button>
+<div class="header">
+    <span>分布式IM聊天室</span>
+    <span id="onlineCount">在线：0 人</span>
+</div>
+<div class="container" id="msgContainer"></div>
+<div class="input-area">
+    <input type="text" id="inputMsg" placeholder="输入消息，回车发送">
+    <button id="sendBtn">发送</button>
+</div>
 
-    <script>
-        // 固定8080端口ws协议
-        let ws = new WebSocket("ws://127.0.0.1:8080/api/ws");
-        let msgBox = document.getElementById("msgBox");
-        let input = document.getElementById("input");
+<script>
+    const urlParams = new URLSearchParams(location.search);
+    const myNick = urlParams.get("nick") || "匿名用户";
 
-        function loadHistory() {
-            fetch("/api/history")
-                .then(res => res.json())
-                .then(ret => {
-                    // 遍历数据库返回的历史记录，渲染到聊天框
-                    ret.data.forEach(item => {
-                        let html = `[${item.CreateTime}] ${item.Sender}: ${item.Content}<br/>`
-                        msgBox.innerHTML += html
-                    })
-                    // 滚动条自动滑到最底部
-                    msgBox.scrollTop = msgBox.scrollHeight
-                })
-        }
-        // 页面打开立刻加载数据库历史记录
-        loadHistory()
+    const ws = new WebSocket("ws://" + location.host + "/api/ws");
+    const msgContainer = document.getElementById("msgContainer");
+    const inputMsg = document.getElementById("inputMsg");
+    const sendBtn = document.getElementById("sendBtn");
+    const onlineCountDom = document.getElementById("onlineCount");
 
-        // 接收后端实时消息
-        ws.onmessage = e => {
-            msgBox.innerHTML += e.data + "<br/>"
-            msgBox.scrollTop = msgBox.scrollHeight
-        }
+    // 渲染消息
+    function renderMsg(sender, text, isSelf) {
+        const divWrap = document.createElement("div");
+        divWrap.className = "msg-item " + (isSelf ? "msg-right" : "msg-left");
+        const box = document.createElement("div");
+        box.className = "msg-box";
+        box.innerHTML = `<div class="sender-name">${sender}</div>${text}`;
+        divWrap.appendChild(box);
+        msgContainer.appendChild(divWrap);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    }
 
-        // ws连接失败打印控制台日志
-        ws.onerror = function (err) {
-            console.error("WebSocket连接出错：", err)
-        }
+    ws.onmessage = function (ev) {
+        // 后端约定格式：【昵称】消息
+        renderMsg("", ev.data, false);
+    };
 
-        // 发送按钮点击事件
-        function send() {
-            let val = input.value.trim()
-            if(!val) return     // 空消息不发送
-            ws.send(val)        // 通过websocket发送文本到后端
-            input.value = ""    // 清空输入框
-        }
-    </script>
+    function send() {
+        const val = inputMsg.value.trim();
+        if (!val) return;
+        // 发送格式：[昵称]内容，后端解析
+        const sendText = `[${myNick}]${val}`;
+        ws.send(sendText);
+        renderMsg(myNick, val, true);
+        inputMsg.value = "";
+    }
+
+    sendBtn.onclick = send;
+    inputMsg.onkeydown = function (e) {
+        if (e.key === "Enter") send();
+    };
+
+    // 定时刷新在线人数
+    function refreshOnline() {
+        fetch("/api/online")
+            .then(r => r.json())
+            .then(res => {
+                onlineCountDom.innerText = "在线：" + res.data.length + " 人";
+            });
+    }
+    setInterval(refreshOnline, 3000);
+    refreshOnline();
+</script>
 </body>
 </html>
