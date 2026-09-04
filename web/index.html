@@ -3,39 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>后台管理</title>
+    <title>后台管理 - IM聊天室</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: system-ui, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
         }
         body {
             background: #161a23;
             color: #e8edf3;
             padding: 30px;
         }
-        h2 {
-            margin-bottom: 24px;
-            color: #ffffff;
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        a.nav-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #4f9aff;
+            text-decoration: none;
         }
         .card {
             background: #202634;
             border-radius: 14px;
             padding: 24px;
-            max-width: 720px;
+            margin-bottom: 20px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        }
+        h2 {
+            margin-bottom: 20px;
+            font-size: 20px;
         }
         .user-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 14px;
+            padding: 12px 16px;
             background: #2a3142;
             border-radius: 8px;
             margin-bottom: 10px;
         }
+        .user-info .nick {
+            font-weight: 500;
+            font-size: 16px;
+        }
+        .user-info small {
+            color: #99a3b2;
+            display: block;
+            margin-top: 4px;
+        }
+        .tag-web { color: #36d399; }
+        .tag-tcp { color: #fbbf24; }
         .kick-btn {
             padding: 6px 14px;
             border-radius: 6px;
@@ -44,67 +65,236 @@
             color: #fff;
             cursor: pointer;
         }
-        .tip-empty {
-            color: #8892a0;
-            padding: 10px;
+        .tip-empty { color: #8892a0; padding: 12px; }
+        .broadcast-area { display: flex; gap: 10px; }
+        #broadcastInput {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: none;
+            background: #2c3444;
+            color: #fff;
+            outline: none;
+            font-size: 15px;
         }
-        .nav-link {
-            display: inline-block;
-            margin-bottom: 20px;
+        #broadcastBtn {
+            padding: 0 20px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: #fff;
+            cursor: pointer;
+        }
+        .operate-row { display: flex; gap: 12px; margin-top: 16px; }
+        .danger-btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #991b1b;
+            color: #fff;
+            cursor: pointer;
+        }
+        .msg-tip {
+            margin-top: 12px;
+            color: #36d399;
+            height: 22px;
+        }
+        .stat-row {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            background: #2a3142;
+            border-radius: 10px;
+            padding: 14px 20px;
+            min-width: 130px;
+        }
+        .stat-item .num {
+            font-size: 24px;
+            font-weight: 600;
             color: #4f9aff;
-            text-decoration: none;
+        }
+        .stat-item .label {
+            font-size: 12px;
+            color: #99a3b2;
+            margin-top: 4px;
         }
     </style>
 </head>
 <body>
-<div class="card">
-    <a class="nav-link" href="./chat.html">← 返回聊天室</a>
-    <h2>在线用户管理</h2>
-    <div id="userList"></div>
+<div class="container">
+    <a class="nav-link" href="./login.html">← 返回登录页</a>
+
+    <!-- 服务状态面板 -->
+    <div class="card">
+        <h2>📊 服务运行信息</h2>
+        <div class="stat-row" id="serverInfo">加载中...</div>
+    </div>
+
+    <!-- 全局广播模块 -->
+    <div class="card">
+        <h2>📢 全局广播消息</h2>
+        <div class="broadcast-area">
+            <input id="broadcastInput" placeholder="输入公告，全员可见" maxlength="200">
+            <button id="broadcastBtn">发送广播</button>
+        </div>
+        <div class="msg-tip" id="broadcastTip"></div>
+    </div>
+
+    <!-- 在线用户列表 -->
+    <div class="card">
+        <h2>👥 在线用户列表 <span id="onlineTotal">(0)</span></h2>
+        <div id="userList"></div>
+        <div class="operate-row">
+            <button class="danger-btn" id="clearAllBtn">一键断开所有连接</button>
+        </div>
+    </div>
 </div>
-
 <script>
-    const userListDom = document.getElementById("userList");
-
-    function loadOnlineUser() {
-        fetch("/api/online")
-            .then(r => r.json())
-            .then(res => {
-                const list = res.data;
-                userListDom.innerHTML = "";
-                if (list.length === 0) {
-                    userListDom.innerHTML = '<div class="tip-empty">暂无在线用户</div>';
-                    return;
-                }
-                list.forEach(u => {
-                    const div = document.createElement("div");
-                    div.className = "user-item";
-                    div.innerHTML = `
-                            <div>昵称：${u.name}<br><small style="color:#99a3b2">地址：${u.addr}</small></div>
-                            <button class="kick-btn" data-name="${u.name}">踢出</button>
-                        `;
-                    userListDom.appendChild(div);
-                });
-
-                // 绑定踢出事件
-                document.querySelectorAll(".kick-btn").forEach(btn => {
-                    btn.onclick = async function () {
-                        const name = this.dataset.name;
-                        if (!confirm(`确认踢出【${name}】？`)) return;
-                        const resp = await fetch("/api/kick", {
-                            method: "POST",
-                            headers: {"Content-Type":"application/json"},
-                            body: JSON.stringify({Username: name})
-                        });
-                        const result = await resp.json();
-                        alert(result.msg);
-                        loadOnlineUser();
-                    }
-                })
-            })
+    // HTML 转义：在线用户昵称来自用户输入，必须转义后插入，防 XSS
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
+
+    const userListDom = document.getElementById("userList");
+    const onlineTotalDom = document.getElementById("onlineTotal");
+    const serverInfoDom = document.getElementById("serverInfo");
+    const broadcastInput = document.getElementById("broadcastInput");
+    const broadcastBtn = document.getElementById("broadcastBtn");
+    const broadcastTip = document.getElementById("broadcastTip");
+    const clearAllBtn = document.getElementById("clearAllBtn");
+
+    // 刷新在线用户
+    async function loadOnlineUser() {
+        try {
+            const resp = await fetch("/api/online");
+            const res = await resp.json();
+            if (res.code !== 0) return;
+            const list = res.data;
+            onlineTotalDom.innerText = `(${list.length})`;
+            userListDom.innerHTML = "";
+            if (list.length === 0) {
+                userListDom.innerHTML = '<div class="tip-empty">暂无在线用户</div>';
+                return;
+            }
+            list.forEach(u => {
+                const div = document.createElement("div");
+                div.className = "user-item";
+                const tagClass = u.clientType === "web" ? "tag-web" : "tag-tcp";
+                const tagText = u.clientType === "web" ? "Web客户端" : "TCP客户端";
+                // 昵称经 escapeHtml 转义后再拼 HTML
+                div.innerHTML = `
+                    <div class="user-info">
+                        <div class="nick">${escapeHtml(u.name)} <span class="${tagClass}">[${tagText}]</span></div>
+                        <small>地址：${escapeHtml(u.addr)}</small>
+                    </div>
+                    <button class="kick-btn" data-name="${escapeHtml(u.name)}">踢出</button>
+                `;
+                userListDom.appendChild(div);
+            });
+            // 踢出事件绑定（用 data-name 原值，转义仅用于展示）
+            document.querySelectorAll(".kick-btn").forEach(btn => {
+                btn.onclick = async function () {
+                    const name = this.dataset.name;
+                    if (!confirm(`确认踢出【${name}】？`)) return;
+                    const resp = await fetch("/api/kick", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ Username: name })
+                    });
+                    const result = await resp.json();
+                    alert(result.msg);
+                    loadOnlineUser();
+                };
+            });
+        } catch (e) {
+            console.error("加载在线用户失败", e);
+        }
+    }
+
+    // 发送全局广播
+    broadcastBtn.onclick = async () => {
+        const content = broadcastInput.value.trim();
+        if (!content) {
+            broadcastTip.innerText = "内容不能为空";
+            broadcastTip.style.color = "#f87171";
+            return;
+        }
+        try {
+            const resp = await fetch("/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ msg: content })
+            });
+            const ret = await resp.json();
+            broadcastTip.innerText = ret.msg;
+            broadcastTip.style.color = "#36d399";
+            broadcastInput.value = "";
+            setTimeout(() => (broadcastTip.innerText = ""), 3000);
+        } catch (e) {
+            broadcastTip.innerText = "发送失败";
+            broadcastTip.style.color = "#f87171";
+        }
+    };
+
+    // 一键断开全部连接
+    clearAllBtn.onclick = async () => {
+        if (!confirm("警告：确认断开所有在线用户连接？")) return;
+        try {
+            const resp = await fetch("/api/kickall", { method: "POST" });
+            const ret = await resp.json();
+            alert(ret.msg);
+            loadOnlineUser();
+        } catch (e) {
+            alert("操作失败");
+        }
+    };
+
+    // 获取服务状态：在线人数 / 消息总数 / 启动时间 / 运行时长
+    async function loadServerInfo() {
+        try {
+            const resp = await fetch("/api/status");
+            const res = await resp.json();
+            if (res.code !== 0) return;
+            const d = res.data;
+            const uptimeMin = Math.floor(d.uptimeSec / 60);
+            const uptimeStr = uptimeMin > 0 ? `${uptimeMin} 分钟` : `${d.uptimeSec} 秒`;
+            serverInfoDom.innerHTML = `
+                <div class="stat-item">
+                    <div class="num">${d.onlineNum}</div>
+                    <div class="label">当前在线</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num">${d.totalMsg}</div>
+                    <div class="label">历史消息总数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num">${escapeHtml(d.bootTime)}</div>
+                    <div class="label">服务启动时间</div>
+                </div>
+                <div class="stat-item">
+                    <div class="num">${uptimeStr}</div>
+                    <div class="label">已运行时长</div>
+                </div>
+            `;
+        } catch (e) {
+            serverInfoDom.innerHTML = '<div class="tip-empty">服务信息加载失败</div>';
+        }
+    }
+
+    // 定时刷新
     loadOnlineUser();
-    setInterval(loadOnlineUser, 3000);
-    </script>
+    loadServerInfo();
+    setInterval(() => {
+        loadOnlineUser();
+        loadServerInfo();
+    }, 3000);
+</script>
 </body>
 </html>

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登录 - IM聊天室</title>
     <style>
         * {
@@ -26,8 +27,14 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
         h2 {
-            margin-bottom: 24px;
+            margin-bottom: 8px;
             text-align: center;
+        }
+        .sub {
+            text-align: center;
+            color: #8892a0;
+            font-size: 13px;
+            margin-bottom: 24px;
         }
         #nickInput {
             width: 100%;
@@ -50,35 +57,59 @@
             font-size: 16px;
             cursor: pointer;
         }
-        #enterBtn:hover {
-            opacity: 0.85;
+        #enterBtn:hover { opacity: 0.85; }
+        #tip {
+            margin-top: 12px;
+            text-align: center;
+            color: #f87171;
+            font-size: 13px;
+            height: 18px;
+        }
+        .admin-link {
+            display: block;
+            text-align: center;
+            margin-top: 16px;
+            color: #4f9aff;
+            text-decoration: none;
+            font-size: 13px;
         }
     </style>
 </head>
 <body>
-    <div class="login-card">
-    <h2>输入昵称进入聊天室</h2>
-    <input id="nickInput" type="text" placeholder="请输入昵称" maxlength="12">
+<div class="login-card">
+    <h2>IM 聊天室</h2>
+    <div class="sub">输入昵称进入聊天室</div>
+    <input id="nickInput" type="text" placeholder="1-20个字符，中文/字母/数字" maxlength="20">
     <button id="enterBtn">进入聊天室</button>
+    <div id="tip"></div>
+    <a class="admin-link" href="./index.html">后台管理 →</a>
 </div>
-
 <script>
     const nickInput = document.getElementById("nickInput");
     const enterBtn = document.getElementById("enterBtn");
+    const tipDom = document.getElementById("tip");
+
+    // 前端昵称校验：与后端 validNick 保持一致（后端才是最终防线）
+    function validNick(nick) {
+        if (nick.length < 1 || nick.length > 20) return false;
+        // 禁止空白、控制字符及会破坏消息格式/引发XSS的特殊字符
+        if (/[\s<>&"'\[\]{}`\\/:;]/.test(nick)) return false;
+        return true;
+    }
 
     function enterRoom() {
-        let nick = nickInput.value.trim();
-        if (!nick) {
-            alert("昵称不能为空");
+        const nick = nickInput.value.trim();
+        if (!validNick(nick)) {
+            tipDom.innerText = "昵称不合法：1-20字符，且不能含空格及特殊字符";
             return;
         }
-        // 跳转聊天室，url携带昵称参数
         location.href = `chat.html?nick=${encodeURIComponent(nick)}`;
     }
     enterBtn.onclick = enterRoom;
     nickInput.onkeydown = e => {
         if (e.key === "Enter") enterRoom();
-    }
+    };
+    nickInput.addEventListener("input", () => (tipDom.innerText = ""));
 </script>
 </body>
 </html>

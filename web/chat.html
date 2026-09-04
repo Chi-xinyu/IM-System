@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>聊天室</title>
+    <title>IM 聊天室</title>
     <style>
         * {
             margin: 0;
@@ -27,37 +27,44 @@
             justify-content: space-between;
             align-items: center;
         }
-        #onlineCount {
-            font-size: 14px;
+        .header .left { display: flex; align-items: center; gap: 12px; }
+        #onlineCount { font-size: 14px; color: #8892a0; }
+        #connState {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: #2c3444;
             color: #8892a0;
         }
+        #connState.on { background: #143d2b; color: #36d399; }
+        #connState.off { background: #3d1a1a; color: #f87171; }
         .container {
             flex: 1;
             padding: 16px;
             overflow-y: auto;
         }
+        /* 系统消息：居中灰色小字 */
+        .sys-msg {
+            text-align: center;
+            color: #7b8698;
+            font-size: 13px;
+            margin: 12px 0;
+        }
         .msg-item {
             margin-bottom: 16px;
             display: flex;
         }
-        .msg-left {
-            justify-content: flex-start;
-        }
-        .msg-right {
-            justify-content: flex-end;
-        }
+        .msg-left { justify-content: flex-start; }
+        .msg-right { justify-content: flex-end; }
         .msg-box {
             max-width: 65%;
             padding: 10px 14px;
             border-radius: 12px;
             line-height: 1.55;
+            word-break: break-word;
         }
-        .msg-left .msg-box {
-            background-color: #2a3142;
-        }
-        .msg-right .msg-box {
-            background-color: #2563eb;
-        }
+        .msg-left .msg-box { background-color: #2a3142; }
+        .msg-right .msg-box { background-color: #2563eb; }
         .sender-name {
             font-size: 12px;
             color: #a2acbd;
@@ -89,74 +96,178 @@
             font-weight: 500;
             transition: opacity 0.2s;
         }
-        #sendBtn:hover {
-            opacity: 0.85;
-        }
+        #sendBtn:hover { opacity: 0.85; }
+        #sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body>
 <div class="header">
-    <span>分布式IM聊天室</span>
+    <span class="left">
+        <span>💬 聊天室</span>
+        <span id="connState">连接中...</span>
+    </span>
     <span id="onlineCount">在线：0 人</span>
 </div>
 <div class="container" id="msgContainer"></div>
 <div class="input-area">
-    <input type="text" id="inputMsg" placeholder="输入消息，回车发送">
+    <input type="text" id="inputMsg" placeholder="输入消息，回车发送" maxlength="500">
     <button id="sendBtn">发送</button>
 </div>
-
 <script>
-    const urlParams = new URLSearchParams(location.search);
-    const myNick = urlParams.get("nick") || "匿名用户";
+    // ============ 基础工具 ============
+    // HTML 转义：所有用户输入（昵称/消息内容）必须经此函数转义后再插入 innerHTML，
+    // 防止恶意消息注入 <script>/<img onerror> 等 XSS 攻击
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
 
-    const ws = new WebSocket("ws://" + location.host + "/api/ws");
+    // 解析服务端消息格式: [sender] content
+    // 昵称在后端已禁止 [ ] 字符，因此第一个 ] 就是分隔符，解析安全
+    function parseMsg(raw) {
+        if (typeof raw === "string" && raw.startsWith("[")) {
+            const idx = raw.indexOf("]");
+            if (idx > 1) {
+                return {
+                    sender: raw.slice(1, idx),
+                    content: raw.slice(idx + 1).replace(/^\s+/, "")
+                };
+            }
+        }
+        return { sender: "", content: String(raw) };
+    }
+
+    // ============ 页面元素 ============
+    const urlParams = new URLSearchParams(location.search);
+    const myNick = urlParams.get("nick") || "";
+    if (!myNick) {
+        // 无昵称直接回登录页
+        location.replace("./login.html");
+    }
     const msgContainer = document.getElementById("msgContainer");
     const inputMsg = document.getElementById("inputMsg");
     const sendBtn = document.getElementById("sendBtn");
     const onlineCountDom = document.getElementById("onlineCount");
+    const connStateDom = document.getElementById("connState");
 
-    // 渲染消息
+    // ============ 消息渲染 ============
+    // 渲染一条消息：系统消息居中灰字，普通消息按是否本人分左右气泡
     function renderMsg(sender, text, isSelf) {
+        const isSys = (sender === "系统" || sender === "系统公告");
         const divWrap = document.createElement("div");
+
+        if (isSys) {
+            divWrap.className = "sys-msg";
+            divWrap.textContent = text; // textContent 天然防XSS
+            msgContainer.appendChild(divWrap);
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+            return;
+        }
+
         divWrap.className = "msg-item " + (isSelf ? "msg-right" : "msg-left");
         const box = document.createElement("div");
         box.className = "msg-box";
-        box.innerHTML = `<div class="sender-name">${sender}</div>${text}`;
+        // 昵称与内容都经过 escapeHtml 转义后拼接
+        box.innerHTML =
+            `<div class="sender-name">${escapeHtml(sender)}</div>` +
+            escapeHtml(text).replace(/\n/g, "<br>");
         divWrap.appendChild(box);
         msgContainer.appendChild(divWrap);
         msgContainer.scrollTop = msgContainer.scrollHeight;
     }
 
-    ws.onmessage = function (ev) {
-        // 后端约定格式：【昵称】消息
-        renderMsg("", ev.data, false);
-    };
-
-    function send() {
-        const val = inputMsg.value.trim();
-        if (!val) return;
-        // 发送格式：[昵称]内容，后端解析
-        const sendText = `[${myNick}]${val}`;
-        ws.send(sendText);
-        renderMsg(myNick, val, true);
-        inputMsg.value = "";
+    // 渲染历史消息（进入聊天室时加载）
+    async function loadHistory() {
+        try {
+            const resp = await fetch("/api/history?limit=50");
+            const res = await resp.json();
+            if (res.code !== 0) return;
+            res.data.forEach(m => {
+                renderMsg(m.sender, m.content, m.sender === myNick);
+            });
+        } catch (e) {
+            console.error("加载历史消息失败", e);
+        }
     }
 
+    // ============ WebSocket ============
+    let ws = null;
+    let reconnectTimer = null;
+    let manualClose = false;
+
+    function connectWS() {
+        connStateDom.className = "off";
+        connStateDom.innerText = "连接中...";
+        // 浏览器 WebSocket 自动响应服务端 Ping 帧（回 Pong），无需手动实现心跳
+        ws = new WebSocket(`ws://${location.host}/api/ws?nick=${encodeURIComponent(myNick)}`);
+
+        ws.onopen = function () {
+            connStateDom.className = "on";
+            connStateDom.innerText = "已连接";
+            sendBtn.disabled = false;
+        };
+
+        ws.onmessage = function (ev) {
+            // 服务端统一广播：解析 [sender] content
+            const { sender, content } = parseMsg(ev.data);
+            renderMsg(sender, content, sender === myNick);
+        };
+
+        ws.onclose = function () {
+            connStateDom.className = "off";
+            connStateDom.innerText = "已断开";
+            sendBtn.disabled = true;
+            if (!manualClose) {
+                // 断线自动重连，3秒后重试
+                connStateDom.innerText = "重连中...";
+                clearTimeout(reconnectTimer);
+                reconnectTimer = setTimeout(connectWS, 3000);
+            }
+        };
+
+        ws.onerror = function () {
+            ws.close(); // 触发 onclose 走重连逻辑
+        };
+    }
+
+    // ============ 发送 ============
+    function send() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const val = inputMsg.value.trim();
+        if (!val) return;
+        // 【格式修复】只发送纯内容，不再拼 [昵称] 前缀
+        // （旧版前后端各拼一次导致消息显示为 [nick][nick]内容；
+        //   现在消息由服务端统一广播回环，本人消息也会收到，由 sender 判断左右）
+        ws.send(val);
+        inputMsg.value = "";
+        inputMsg.focus();
+    }
     sendBtn.onclick = send;
     inputMsg.onkeydown = function (e) {
         if (e.key === "Enter") send();
     };
 
-    // 定时刷新在线人数
+    // ============ 在线人数 ============
     function refreshOnline() {
         fetch("/api/online")
             .then(r => r.json())
             .then(res => {
-                onlineCountDom.innerText = "在线：" + res.data.length + " 人";
-            });
+                if (res.code === 0) {
+                    onlineCountDom.innerText = "在线：" + res.data.length + " 人";
+                }
+            })
+            .catch(() => {});
     }
-    setInterval(refreshOnline, 3000);
+
+    // ============ 启动 ============
+    loadHistory();
+    connectWS();
     refreshOnline();
+    setInterval(refreshOnline, 3000);
 </script>
 </body>
 </html>

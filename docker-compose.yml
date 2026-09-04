@@ -1,45 +1,51 @@
 services:
-  # Redis中间件服务
+  # ========== Redis 中间件 ==========
   redis:
     image: redis:7-alpine
     container_name: im-redis
     ports:
       - "6379:6379"
     volumes:
-      # Redis数据持久化，重启不丢失在线缓存
+      # Redis 数据持久化，重启不丢失在线缓存
       - redis_data:/data
     command: redis-server --appendonly yes
     restart: always
+    # 健康检查：redis-cli ping 通才算就绪，im-server 依赖它
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       im-net:
 
-  # IM Web网关（内置TCP服务）
+  # ========== IM Web 网关（内置 TCP 服务） ==========
   im-server:
     build: .
     container_name: im-server
     ports:
       - "8080:8080" # Web/网页端端口
-      - "8888:8888" # TCP客户端端口
-    # 依赖redis，保证redis先启动
+      - "8888:8888" # TCP 客户端端口
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy # Redis 健康后才启动，避免连接失败
     environment:
-      # 容器内redis服务名作为host，无需127.0.0.1
+      # 容器内用服务名 redis 作为 host，无需 127.0.0.1
       REDIS_ADDR: redis:6379
       REDIS_PWD: ""
       REDIS_DB: 0
     volumes:
-      # SQLite聊天消息持久化
+      # SQLite 聊天消息持久化（宿主机上可备份 db/chat.db）
       - sqlite_data:/app/db
     restart: always
     networks:
       im-net:
 
-# 数据卷持久化
+# ========== 数据卷持久化 ==========
 volumes:
   redis_data:
   sqlite_data:
 
-# 自定义网络，容器互通
+# ========== 自定义网络，容器互通 ==========
 networks:
   im-net:
